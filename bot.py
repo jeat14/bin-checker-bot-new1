@@ -27,6 +27,14 @@ async def get_bin_info(bin_number):
     return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    commands = [
+        BotCommand("start", "Start the bot"),
+        BotCommand("help", "Show help menu"),
+        BotCommand("about", "About this bot"),
+        BotCommand("example", "Show example BINs")
+    ]
+    await context.bot.set_my_commands(commands)
+    
     welcome_message = (
         "🏦 Welcome to Premium BIN Checker!\n\n"
         "Commands:\n"
@@ -161,15 +169,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'help':
         await help_command(update, context)
 
-async def setup_commands(application: Application):
-    commands = [
-        BotCommand("start", "Start the bot"),
-        BotCommand("help", "Show help menu"),
-        BotCommand("about", "About this bot"),
-        BotCommand("example", "Show example BINs")
-    ]
-    await application.bot.set_my_commands(commands)
-
 def main():
     application = Application.builder().token(TOKEN).build()
 
@@ -180,9 +179,6 @@ def main():
     application.add_handler(CommandHandler("example", example_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_bin))
     application.add_handler(CallbackQueryHandler(button_callback))
-
-    # Setup commands
-    application.run_task(setup_commands(application))
 
     print("Premium BIN Checker Bot is starting...")
     application.run_polling(drop_pending_updates=True)
