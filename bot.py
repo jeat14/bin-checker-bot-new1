@@ -1,29 +1,38 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import requests
+import json
 
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
 async def get_bin_info(bin_number):
     headers = {
-        'Accept-Version': '3',
+        'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
     try:
-        response = requests.get(f'https://bins.antipublic.cc/bins/{bin_number}', headers=headers)
+        # First API
+        url = f"https://bins-su-api.vercel.app/api/{bin_number}"
+        response = requests.get(url, headers=headers)
         if response.status_code == 200:
             return response.json()
     except:
-        pass
-        
-    try:
-        response = requests.get(f'https://lookup.binlist.net/{bin_number}')
-        if response.status_code == 200:
-            return response.json()
-    except:
-        pass
-    
+        try:
+            # Second API
+            url = f"https://lookup.binlist.net/{bin_number}"
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+        except:
+            try:
+                # Third API
+                url = f"https://bins.antipublic.cc/bins/{bin_number}"
+                response = requests.get(url, headers=headers)
+                if response.status_code == 200:
+                    return response.json()
+            except:
+                return None
     return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,13 +113,14 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bin_number = bin_number[:6]
+    await update.message.reply_text("🔍 Checking BIN... Please wait.")
     
     data = await get_bin_info(bin_number)
     
     if data:
         try:
             # Get card type and prepaid status
-            card_type = str(data.get('type', '')).upper()
+            card_type = str(data.get('type', data.get('scheme', ''))).upper()
             if 'PREPAID' in card_type:
                 prepaid_text = "YES - PREPAID CARD ✅"
             elif 'DEBIT' in card_type:
@@ -120,21 +130,30 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 prepaid_text = "UNKNOWN ❓"
             
+            # Get bank info
+            bank_name = data.get('bank', {}).get('name', data.get('bank', 'N/A'))
+            bank_url = data.get('bank', {}).get('url', 'N/A')
+            bank_phone = data.get('bank', {}).get('phone', 'N/A')
+            
+            # Get country info
+            country = data.get('country', {}).get('name', data.get('country', 'N/A'))
+            currency = data.get('country', {}).get('currency', data.get('currency', 'N/A'))
+            
             result = (
                 f"🔍 BIN INFORMATION: {bin_number}\n"
                 f"━━━━━━━━━━━━━━━\n\n"
                 f"💳 CARD DETAILS:\n"
-                f"• Brand: {data.get('scheme', '').upper() or data.get('brand', 'N/A').upper()}\n"
+                f"• Brand: {data.get('scheme', data.get('brand', 'N/A')).upper()}\n"
                 f"• Type: {card_type}\n"
-                f"• Category: {data.get('level', 'N/A').upper()}\n"
+                f"• Category: {data.get('level', data.get('category', 'N/A')).upper()}\n"
                 f"• Prepaid: {prepaid_text}\n\n"
                 f"🏦 BANK INFO:\n"
-                f"• Name: {data.get('bank', {}).get('name', data.get('bank', 'N/A'))}\n"
-                f"• Website: {data.get('bank', {}).get('url', 'www.bank.com')}\n"
-                f"• Phone: {data.get('bank', {}).get('phone', '+1234567890')}\n\n"
+                f"• Name: {bank_name}\n"
+                f"• Website: {bank_url}\n"
+                f"• Phone: {bank_phone}\n\n"
                 f"📍 COUNTRY INFO:\n"
-                f"• Country: {data.get('country', {}).get('name', data.get('country', 'N/A'))}\n"
-                f"• Currency: {data.get('country', {}).get('currency', 'USD')}\n"
+                f"• Country: {country}\n"
+                f"• Currency: {currency}\n"
                 f"• Region: {data.get('country', {}).get('region', 'N/A')}\n\n"
                 f"✨ EXTRA INFO:\n"
                 f"• Valid Length: 16\n"
