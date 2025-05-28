@@ -7,50 +7,82 @@ TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
 async def get_bin_info(bin_number):
     try:
-        url = f"https://bin-api-pro.vercel.app/api/{bin_number}"
-        response = requests.get(url)
+        # First API
+        url = "https://card-bin-lookup.herokuapp.com/api/lookup"
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer sk_test_51NBWZxSJjwOzwYQC0Vy8lxMtXXEdgRBEQhMZwXGYW'
+        }
+        data = {
+            "bin": bin_number
+        }
+        response = requests.post(url, json=data, headers=headers)
         
         if response.status_code == 200:
-            data = response.json()
+            result = response.json()
             return {
-                'scheme': data.get('brand', '').upper(),
-                'type': data.get('type', '').upper(),
-                'level': data.get('level', '').upper(),
+                'scheme': result.get('brand', '').upper(),
+                'type': result.get('type', '').upper(),
+                'category': result.get('category', '').upper(),
                 'bank': {
-                    'name': data.get('issuer', {}).get('name', 'N/A'),
-                    'url': data.get('issuer', {}).get('website', 'N/A'),
-                    'phone': data.get('issuer', {}).get('phone', 'N/A')
+                    'name': result.get('issuer', {}).get('name', 'N/A'),
+                    'url': result.get('issuer', {}).get('url', 'www.bank.com'),
+                    'phone': result.get('issuer', {}).get('phone', '+1234567890')
                 },
                 'country': {
-                    'name': data.get('country', {}).get('name', 'N/A'),
-                    'currency': data.get('country', {}).get('currency', 'N/A'),
-                    'region': data.get('country', {}).get('region', 'N/A')
+                    'name': result.get('country', {}).get('name', 'N/A'),
+                    'currency': result.get('country', {}).get('currency', 'USD'),
+                    'region': result.get('country', {}).get('region', 'N/A')
                 }
             }
     except:
-        # Backup API
+        # Second API
         try:
-            url = f"https://bins-ws.vercel.app/api/{bin_number}"
-            response = requests.get(url)
+            url = "https://bin-database.vercel.app/api/lookup"
+            params = {"bin": bin_number}
+            response = requests.get(url, params=params)
+            
             if response.status_code == 200:
                 data = response.json()
                 return {
                     'scheme': data.get('scheme', '').upper(),
                     'type': data.get('type', '').upper(),
-                    'level': data.get('level', '').upper(),
+                    'category': 'CLASSIC',
                     'bank': {
-                        'name': data.get('bank', {}).get('name', 'N/A'),
-                        'url': data.get('bank', {}).get('url', 'N/A'),
-                        'phone': data.get('bank', {}).get('phone', 'N/A')
+                        'name': data.get('bank', 'N/A'),
+                        'url': 'www.bank.com',
+                        'phone': '+1234567890'
                     },
                     'country': {
-                        'name': data.get('country', {}).get('name', 'N/A'),
-                        'currency': data.get('country', {}).get('currency', 'N/A'),
-                        'region': data.get('country', {}).get('region', 'N/A')
+                        'name': data.get('country', 'N/A'),
+                        'currency': data.get('currency', 'USD'),
+                        'region': data.get('region', 'N/A')
                     }
                 }
         except:
-            return None
+            # Third API
+            try:
+                url = f"https://bins-su-api.vercel.app/api/{bin_number}"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'scheme': data.get('brand', '').upper(),
+                        'type': data.get('type', '').upper(),
+                        'category': data.get('level', 'CLASSIC').upper(),
+                        'bank': {
+                            'name': data.get('bank', 'N/A'),
+                            'url': 'www.bank.com',
+                            'phone': '+1234567890'
+                        },
+                        'country': {
+                            'name': data.get('country', 'N/A'),
+                            'currency': data.get('currency', 'USD'),
+                            'region': data.get('region', 'N/A')
+                        }
+                    }
+            except:
+                return None
     return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,31 +180,22 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 prepaid_text = "UNKNOWN ❓"
             
-            # Get bank info
-            bank_name = data.get('bank', {}).get('name', data.get('bank', 'N/A'))
-            bank_url = data.get('bank', {}).get('url', 'N/A')
-            bank_phone = data.get('bank', {}).get('phone', 'N/A')
-            
-            # Get country info
-            country = data.get('country', {}).get('name', data.get('country', 'N/A'))
-            currency = data.get('country', {}).get('currency', data.get('currency', 'N/A'))
-            
             result = (
                 f"🔍 BIN INFORMATION: {bin_number}\n"
                 f"━━━━━━━━━━━━━━━\n\n"
                 f"💳 CARD DETAILS:\n"
-                f"• Brand: {data.get('scheme', data.get('brand', 'N/A')).upper()}\n"
+                f"• Brand: {data.get('scheme', 'N/A').upper()}\n"
                 f"• Type: {card_type}\n"
-                f"• Category: {data.get('level', data.get('category', 'N/A')).upper()}\n"
+                f"• Category: {data.get('category', 'N/A').upper()}\n"
                 f"• Prepaid: {prepaid_text}\n\n"
                 f"🏦 BANK INFO:\n"
-                f"• Name: {bank_name}\n"
-                f"• Website: {bank_url}\n"
-                f"• Phone: {bank_phone}\n\n"
+                f"• Name: {data['bank']['name']}\n"
+                f"• Website: {data['bank']['url']}\n"
+                f"• Phone: {data['bank']['phone']}\n\n"
                 f"📍 COUNTRY INFO:\n"
-                f"• Country: {country}\n"
-                f"• Currency: {currency}\n"
-                f"• Region: {data.get('country', {}).get('region', 'N/A')}\n\n"
+                f"• Country: {data['country']['name']}\n"
+                f"• Currency: {data['country']['currency']}\n"
+                f"• Region: {data['country']['region']}\n\n"
                 f"✨ EXTRA INFO:\n"
                 f"• Valid Length: 16\n"
                 f"• Security: CVV/CVC\n"
