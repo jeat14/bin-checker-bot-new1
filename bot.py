@@ -6,64 +6,51 @@ import json
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
 async def get_bin_info(bin_number):
-    # First API
     try:
-        url = f"https://bin-checker-pro.p.rapidapi.com/bin/{bin_number}"
-        headers = {
-            "X-RapidAPI-Key": "0e4a5f7f98mshf0f37c3f7f0e19ep1c1b6cjsn18dd29b51e2e",
-            "X-RapidAPI-Host": "bin-checker-pro.p.rapidapi.com"
-        }
-        response = requests.get(url, headers=headers)
+        url = f"https://bin-api-pro.vercel.app/api/{bin_number}"
+        response = requests.get(url)
+        
         if response.status_code == 200:
             data = response.json()
             return {
-                'scheme': data.get('brand'),
-                'type': data.get('type'),
-                'level': data.get('level'),
+                'scheme': data.get('brand', '').upper(),
+                'type': data.get('type', '').upper(),
+                'level': data.get('level', '').upper(),
                 'bank': {
-                    'name': data.get('bank'),
-                    'url': data.get('bank_website'),
-                    'phone': data.get('bank_phone')
+                    'name': data.get('issuer', {}).get('name', 'N/A'),
+                    'url': data.get('issuer', {}).get('website', 'N/A'),
+                    'phone': data.get('issuer', {}).get('phone', 'N/A')
                 },
                 'country': {
-                    'name': data.get('country'),
-                    'currency': data.get('currency')
+                    'name': data.get('country', {}).get('name', 'N/A'),
+                    'currency': data.get('country', {}).get('currency', 'N/A'),
+                    'region': data.get('country', {}).get('region', 'N/A')
                 }
             }
     except:
-        # Second API
+        # Backup API
         try:
-            url = f"https://bincheck.io/api/v1/bin/{bin_number}"
-            headers = {
-                'Authorization': 'Bearer sk_live_TNeMGxkcBKrQXp4G',
-                'Accept': 'application/json'
-            }
-            response = requests.get(url, headers=headers)
+            url = f"https://bins-ws.vercel.app/api/{bin_number}"
+            response = requests.get(url)
             if response.status_code == 200:
                 data = response.json()
                 return {
-                    'scheme': data.get('brand'),
-                    'type': data.get('type'),
-                    'level': data.get('category'),
+                    'scheme': data.get('scheme', '').upper(),
+                    'type': data.get('type', '').upper(),
+                    'level': data.get('level', '').upper(),
                     'bank': {
-                        'name': data.get('issuer'),
-                        'url': data.get('website'),
-                        'phone': data.get('phone')
+                        'name': data.get('bank', {}).get('name', 'N/A'),
+                        'url': data.get('bank', {}).get('url', 'N/A'),
+                        'phone': data.get('bank', {}).get('phone', 'N/A')
                     },
                     'country': {
-                        'name': data.get('country'),
-                        'currency': data.get('currency')
+                        'name': data.get('country', {}).get('name', 'N/A'),
+                        'currency': data.get('country', {}).get('currency', 'N/A'),
+                        'region': data.get('country', {}).get('region', 'N/A')
                     }
                 }
         except:
-            # Third API as backup
-            try:
-                url = f"https://lookup.binlist.net/{bin_number}"
-                response = requests.get(url)
-                if response.status_code == 200:
-                    return response.json()
-            except:
-                return None
+            return None
     return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -144,7 +131,7 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bin_number = bin_number[:6]
-    await update.message.reply_text("🔍 Checking BIN... Please wait.")
+    checking_message = await update.message.reply_text("🔍 Checking BIN... Please wait.")
     
     data = await get_bin_info(bin_number)
     
@@ -198,13 +185,16 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
+            await checking_message.delete()
             await update.message.reply_text(result, reply_markup=reply_markup)
         except Exception as e:
+            await checking_message.delete()
             await update.message.reply_text(
                 "❌ Error processing BIN data\n"
                 "Try another BIN or use /example"
             )
     else:
+        await checking_message.delete()
         await update.message.reply_text(
             "❌ BIN not found in database\n"
             "Try another BIN or use /example"
