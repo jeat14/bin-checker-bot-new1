@@ -6,29 +6,60 @@ import json
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
 async def get_bin_info(bin_number):
-    headers = {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    
+    # First API
     try:
-        # First API
-        url = f"https://bins-su-api.vercel.app/api/{bin_number}"
+        url = f"https://bin-checker-pro.p.rapidapi.com/bin/{bin_number}"
+        headers = {
+            "X-RapidAPI-Key": "0e4a5f7f98mshf0f37c3f7f0e19ep1c1b6cjsn18dd29b51e2e",
+            "X-RapidAPI-Host": "bin-checker-pro.p.rapidapi.com"
+        }
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            return {
+                'scheme': data.get('brand'),
+                'type': data.get('type'),
+                'level': data.get('level'),
+                'bank': {
+                    'name': data.get('bank'),
+                    'url': data.get('bank_website'),
+                    'phone': data.get('bank_phone')
+                },
+                'country': {
+                    'name': data.get('country'),
+                    'currency': data.get('currency')
+                }
+            }
     except:
+        # Second API
         try:
-            # Second API
-            url = f"https://lookup.binlist.net/{bin_number}"
+            url = f"https://bincheck.io/api/v1/bin/{bin_number}"
+            headers = {
+                'Authorization': 'Bearer sk_live_TNeMGxkcBKrQXp4G',
+                'Accept': 'application/json'
+            }
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                return {
+                    'scheme': data.get('brand'),
+                    'type': data.get('type'),
+                    'level': data.get('category'),
+                    'bank': {
+                        'name': data.get('issuer'),
+                        'url': data.get('website'),
+                        'phone': data.get('phone')
+                    },
+                    'country': {
+                        'name': data.get('country'),
+                        'currency': data.get('currency')
+                    }
+                }
         except:
+            # Third API as backup
             try:
-                # Third API
-                url = f"https://bins.antipublic.cc/bins/{bin_number}"
-                response = requests.get(url, headers=headers)
+                url = f"https://lookup.binlist.net/{bin_number}"
+                response = requests.get(url)
                 if response.status_code == 200:
                     return response.json()
             except:
