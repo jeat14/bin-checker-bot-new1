@@ -1,19 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import requests
-import os
-from flask import Flask
-from threading import Thread
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is running!"
-
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
 
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
@@ -184,11 +171,6 @@ async def setup_commands(application: Application):
     await application.bot.set_my_commands(commands)
 
 def main():
-    # Start web server
-    web_thread = Thread(target=run_web)
-    web_thread.start()
-    
-    # Start bot
     application = Application.builder().token(TOKEN).build()
 
     # Setup handlers
