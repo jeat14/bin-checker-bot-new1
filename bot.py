@@ -107,7 +107,7 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 prepaid_text = "UNKNOWN ❓"
             
             # Get bank website and phone based on country
-            bank_website = "www.bank.com"  # You can add actual bank websites
+            bank_website = "www.bank.com"
             bank_phone = "+44 800 00 00 00" if country_code == 'GB' else "+1 800 000 0000"
             
             result = (
@@ -153,12 +153,24 @@ def main():
     # Start Flask in a separate thread
     Thread(target=run_flask).start()
     
-    application = ApplicationBuilder().token(TOKEN).build()
+    # Configure the bot with dropout
+    application = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .concurrent_updates(True)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(30)
+        .build()
+    )
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_bin))
     application.add_handler(CallbackQueryHandler(button_callback))
+    
     print("BIN Checker Bot is starting...")
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
