@@ -1,5 +1,12 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
 import requests
 import json
 
@@ -57,19 +64,19 @@ def check_bin_lookup3(bin_number):
     except:
         return None
 
-def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
         "🏦 Premium BIN Checker\n\n"
         "Send any 6-digit BIN number\n"
         "Example: 601101"
     )
-    update.message.reply_text(welcome_message)
+    await update.message.reply_text(welcome_message)
 
-def check_bin(update, context):
+async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bin_number = update.message.text.strip()
     
     if not bin_number.isdigit() or len(bin_number) < 6:
-        update.message.reply_text("❌ Send first 6 digits of card number")
+        await update.message.reply_text("❌ Send first 6 digits of card number")
         return
 
     bin_number = bin_number[:6]
@@ -120,30 +127,28 @@ def check_bin(update, context):
             keyboard = [[InlineKeyboardButton("🔄 Check Another", callback_data='check_another')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            update.message.reply_text(result, reply_markup=reply_markup)
+            await update.message.reply_text(result, reply_markup=reply_markup)
         except Exception as e:
-            update.message.reply_text("❌ Error processing BIN data")
+            await update.message.reply_text("❌ Error processing BIN data")
     else:
-        update.message.reply_text("❌ BIN not found in database")
+        await update.message.reply_text("❌ BIN not found in database")
 
-def button_callback(update, context):
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     if query.data == 'check_another':
-        query.message.reply_text("Send another BIN:")
+        await query.message.reply_text("Send another BIN:")
 
 def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, check_bin))
-    dp.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_bin))
+    application.add_handler(CallbackQueryHandler(button_callback))
 
     print("Premium BIN Checker Bot is starting...")
-    updater.start_polling()
-    updater.idle()
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
