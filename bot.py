@@ -6,83 +6,66 @@ import json
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
 async def get_bin_info(bin_number):
-    try:
-        # First API
-        url = "https://card-bin-lookup.herokuapp.com/api/lookup"
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer sk_test_51NBWZxSJjwOzwYQC0Vy8lxMtXXEdgRBEQhMZwXGYW'
+    apis = [
+        {
+            'url': f'https://lookup.binlist.net/{bin_number}',
+            'headers': {'Accept-Version': '3'}
+        },
+        {
+            'url': f'https://bins.su/api/{bin_number}',
+            'headers': {'Authorization': 'Bearer sk_live_123'}
+        },
+        {
+            'url': f'https://api.bintable.com/v1/{bin_number}',
+            'headers': {'Authorization': 'Bearer 2c0e6171d6f07c7916ca69b0'}
+        },
+        {
+            'url': f'https://bins-su-api.vercel.app/api/{bin_number}',
+            'headers': {}
+        },
+        {
+            'url': f'https://bin-check-dr4g.herokuapp.com/api/{bin_number}',
+            'headers': {}
         }
-        data = {
-            "bin": bin_number
-        }
-        response = requests.post(url, json=data, headers=headers)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return {
-                'scheme': result.get('brand', '').upper(),
-                'type': result.get('type', '').upper(),
-                'category': result.get('category', '').upper(),
-                'bank': {
-                    'name': result.get('issuer', {}).get('name', 'N/A'),
-                    'url': result.get('issuer', {}).get('url', 'www.bank.com'),
-                    'phone': result.get('issuer', {}).get('phone', '+1234567890')
-                },
-                'country': {
-                    'name': result.get('country', {}).get('name', 'N/A'),
-                    'currency': result.get('country', {}).get('currency', 'USD'),
-                    'region': result.get('country', {}).get('region', 'N/A')
-                }
-            }
-    except:
-        # Second API
+    ]
+    
+    for api in apis:
         try:
-            url = "https://bin-database.vercel.app/api/lookup"
-            params = {"bin": bin_number}
-            response = requests.get(url, params=params)
-            
+            response = requests.get(api['url'], headers=api['headers'], timeout=5)
             if response.status_code == 200:
                 data = response.json()
+                
+                # Get bank info
+                bank_info = data.get('bank', {}) if isinstance(data.get('bank'), dict) else {'name': data.get('bank', 'N/A')}
+                bank_name = bank_info.get('name', data.get('bank', 'N/A'))
+                bank_url = bank_info.get('url', 'N/A')
+                bank_phone = bank_info.get('phone', 'N/A')
+                
+                # Get country info
+                country_info = data.get('country', {}) if isinstance(data.get('country'), dict) else {'name': data.get('country', 'N/A')}
+                country_name = country_info.get('name', data.get('country', 'N/A'))
+                country_emoji = country_info.get('emoji', '🌍')
+                currency = country_info.get('currency', data.get('currency', 'N/A'))
+                
                 return {
-                    'scheme': data.get('scheme', '').upper(),
-                    'type': data.get('type', '').upper(),
-                    'category': 'CLASSIC',
+                    'scheme': data.get('scheme', data.get('brand', 'N/A')).upper(),
+                    'type': data.get('type', 'N/A').upper(),
+                    'brand': data.get('brand', data.get('scheme', 'N/A')).upper(),
+                    'category': data.get('category', data.get('level', 'N/A')).upper(),
                     'bank': {
-                        'name': data.get('bank', 'N/A'),
-                        'url': 'www.bank.com',
-                        'phone': '+1234567890'
+                        'name': bank_name,
+                        'url': bank_url,
+                        'phone': bank_phone
                     },
                     'country': {
-                        'name': data.get('country', 'N/A'),
-                        'currency': data.get('currency', 'USD'),
-                        'region': data.get('region', 'N/A')
-                    }
+                        'name': f"{country_emoji} {country_name}",
+                        'currency': currency,
+                        'region': country_info.get('region', 'N/A')
+                    },
+                    'prepaid': data.get('prepaid', False)
                 }
         except:
-            # Third API
-            try:
-                url = f"https://bins-su-api.vercel.app/api/{bin_number}"
-                response = requests.get(url)
-                if response.status_code == 200:
-                    data = response.json()
-                    return {
-                        'scheme': data.get('brand', '').upper(),
-                        'type': data.get('type', '').upper(),
-                        'category': data.get('level', 'CLASSIC').upper(),
-                        'bank': {
-                            'name': data.get('bank', 'N/A'),
-                            'url': 'www.bank.com',
-                            'phone': '+1234567890'
-                        },
-                        'country': {
-                            'name': data.get('country', 'N/A'),
-                            'currency': data.get('currency', 'USD'),
-                            'region': data.get('region', 'N/A')
-                        }
-                    }
-            except:
-                return None
+            continue
     return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,8 +153,8 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data:
         try:
             # Get card type and prepaid status
-            card_type = str(data.get('type', data.get('scheme', ''))).upper()
-            if 'PREPAID' in card_type:
+            card_type = data.get('type', '').upper()
+            if data.get('prepaid') or 'PREPAID' in card_type:
                 prepaid_text = "YES - PREPAID CARD ✅"
             elif 'DEBIT' in card_type:
                 prepaid_text = "NO - DEBIT CARD 💳"
@@ -184,9 +167,9 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🔍 BIN INFORMATION: {bin_number}\n"
                 f"━━━━━━━━━━━━━━━\n\n"
                 f"💳 CARD DETAILS:\n"
-                f"• Brand: {data.get('scheme', 'N/A').upper()}\n"
+                f"• Brand: {data['scheme']}\n"
                 f"• Type: {card_type}\n"
-                f"• Category: {data.get('category', 'N/A').upper()}\n"
+                f"• Category: {data.get('category', 'N/A')}\n"
                 f"• Prepaid: {prepaid_text}\n\n"
                 f"🏦 BANK INFO:\n"
                 f"• Name: {data['bank']['name']}\n"
