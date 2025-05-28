@@ -1,25 +1,7 @@
-import os
-from flask import Flask
-from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, 
-    CommandHandler, 
-    ContextTypes, 
-    MessageHandler, 
-    filters,
-    CallbackQueryHandler
-)
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 import requests
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is Running!"
-
-def run_flask():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+import json
 
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
@@ -48,54 +30,56 @@ CURRENCY_CODES = {
     'JP': 'JPY (¥)',
 }
 
-REGIONS = {
-    'GB': 'Europe',
-    'US': 'North America',
-    'CA': 'North America',
-    'FR': 'Europe',
-    'DE': 'Europe',
-    'IT': 'Europe',
-    'ES': 'Europe',
-    'AU': 'Oceania',
-    'JP': 'Asia',
-}
+def check_bin_lookup1(bin_number):
+    try:
+        url = f"https://lookup.binlist.net/{bin_number}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return None
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def check_bin_lookup2(bin_number):
+    try:
+        url = f"https://bins.antipublic.cc/bins/{bin_number}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return None
+
+def check_bin_lookup3(bin_number):
+    try:
+        url = f"https://bin-checker.net/api/{bin_number}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return None
+
+def start(update, context):
     welcome_message = (
-        "🏦 BIN Checker\n\n"
+        "🏦 Premium BIN Checker\n\n"
         "Send any 6-digit BIN number\n"
         "Example: 601101"
     )
-    await update.message.reply_text(welcome_message)
+    update.message.reply_text(welcome_message)
 
-async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def check_bin(update, context):
     bin_number = update.message.text.strip()
     
     if not bin_number.isdigit() or len(bin_number) < 6:
-        await update.message.reply_text("❌ Send first 6 digits of card number")
+        update.message.reply_text("❌ Send first 6 digits of card number")
         return
 
     bin_number = bin_number[:6]
     
-    try:
-        headers = {
-            'Accept-Version': '3',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        url = f"https://bins.antipublic.cc/bins/{bin_number}"
-        response = requests.get(url, headers=headers)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Get country code and enhanced info
-            country_code = data.get('country', 'N/A')
-            country_name = COUNTRY_CODES.get(country_code, data.get('country', 'N/A'))
-            currency = CURRENCY_CODES.get(country_code, data.get('currency', 'N/A'))
-            region = REGIONS.get(country_code, 'N/A')
-            
-            # Determine card type and prepaid status
+    # Try multiple BIN lookup services
+    data = check_bin_lookup1(bin_number) or check_bin_lookup2(bin_number) or check_bin_lookup3(bin_number)
+    
+    if data:
+        try:
+            # Get card type and prepaid status
             card_type = data.get('type', '').upper()
             if 'PREPAID' in card_type:
                 prepaid_text = "YES - PREPAID CARD ✅"
@@ -106,28 +90,29 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 prepaid_text = "UNKNOWN ❓"
             
-            # Get bank website and phone based on country
-            bank_website = "www.bank.com"
-            bank_phone = "+44 800 00 00 00" if country_code == 'GB' else "+1 800 000 0000"
+            # Get country info
+            country_code = data.get('country', {}).get('code', 'N/A')
+            country_name = COUNTRY_CODES.get(country_code, data.get('country', {}).get('name', 'N/A'))
+            currency = CURRENCY_CODES.get(country_code, data.get('country', {}).get('currency', 'N/A'))
             
             result = (
                 f"🔍 BIN INFORMATION: {bin_number}\n"
                 f"━━━━━━━━━━━━━━━\n\n"
                 f"💳 CARD DETAILS:\n"
-                f"• Brand: {data.get('brand', 'N/A').upper()}\n"
+                f"• Brand: {data.get('scheme', '').upper() or data.get('brand', 'N/A').upper()}\n"
                 f"• Type: {card_type}\n"
-                f"• Category: {data.get('level', 'N/A').upper()}\n"
+                f"• Category: {data.get('brand', 'N/A').upper()}\n"
                 f"• Prepaid: {prepaid_text}\n\n"
                 f"🏦 BANK INFO:\n"
-                f"• Name: {data.get('bank', 'N/A')}\n"
-                f"• Website: {bank_website}\n"
-                f"• Phone: {bank_phone}\n\n"
+                f"• Name: {data.get('bank', {}).get('name', 'N/A')}\n"
+                f"• Website: {data.get('bank', {}).get('url', 'N/A')}\n"
+                f"• Phone: {data.get('bank', {}).get('phone', 'N/A')}\n\n"
                 f"📍 COUNTRY INFO:\n"
                 f"• Country: {country_name}\n"
                 f"• Currency: {currency}\n"
-                f"• Region: {region}\n\n"
+                f"• Region: {data.get('country', {}).get('region', 'N/A')}\n\n"
                 f"✨ EXTRA INFO:\n"
-                f"• Valid Length: 16\n"
+                f"• Valid Length: {data.get('number', {}).get('length', '16')}\n"
                 f"• Security: CVV/CVC\n"
                 f"━━━━━━━━━━━━━━━"
             )
@@ -135,42 +120,30 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [[InlineKeyboardButton("🔄 Check Another", callback_data='check_another')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await update.message.reply_text(result, reply_markup=reply_markup)
-        else:
-            await update.message.reply_text("❌ BIN not found")
-            
-    except Exception as e:
-        await update.message.reply_text("❌ Error checking BIN")
+            update.message.reply_text(result, reply_markup=reply_markup)
+        except Exception as e:
+            update.message.reply_text("❌ Error processing BIN data")
+    else:
+        update.message.reply_text("❌ BIN not found in database")
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def button_callback(update, context):
     query = update.callback_query
-    await query.answer()
+    query.answer()
     
     if query.data == 'check_another':
-        await query.message.reply_text("Send another BIN:")
+        query.message.reply_text("Send another BIN:")
 
 def main():
-    # Start Flask in a separate thread
-    Thread(target=run_flask).start()
-    
-    # Configure the bot with dropout
-    application = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .concurrent_updates(True)
-        .connect_timeout(30)
-        .read_timeout(30)
-        .write_timeout(30)
-        .pool_timeout(30)
-        .build()
-    )
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_bin))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    print("BIN Checker Bot is starting...")
-    application.run_polling(drop_pending_updates=True)
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, check_bin))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+
+    print("Premium BIN Checker Bot is starting...")
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == "__main__":
     main()
