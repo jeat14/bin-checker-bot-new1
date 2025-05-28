@@ -1,14 +1,20 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import requests
 import json
+import os
+from flask import Flask
+from threading import Thread
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 
 TOKEN = "7684349405:AAFZHHlXTVwy7dOI54az9pv8zkjwHGWQXUY"
 
@@ -37,32 +43,21 @@ CURRENCY_CODES = {
     'JP': 'JPY (¥)',
 }
 
-def check_bin_lookup1(bin_number):
+async def check_bin_lookup(bin_number):
     try:
         url = f"https://lookup.binlist.net/{bin_number}"
         response = requests.get(url)
         if response.status_code == 200:
             return response.json()
     except:
-        return None
-
-def check_bin_lookup2(bin_number):
-    try:
-        url = f"https://bins.antipublic.cc/bins/{bin_number}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-    except:
-        return None
-
-def check_bin_lookup3(bin_number):
-    try:
-        url = f"https://bin-checker.net/api/{bin_number}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-    except:
-        return None
+        try:
+            url = f"https://bins.antipublic.cc/bins/{bin_number}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.json()
+        except:
+            return None
+    return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
@@ -81,8 +76,7 @@ async def check_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bin_number = bin_number[:6]
     
-    # Try multiple BIN lookup services
-    data = check_bin_lookup1(bin_number) or check_bin_lookup2(bin_number) or check_bin_lookup3(bin_number)
+    data = await check_bin_lookup(bin_number)
     
     if data:
         try:
@@ -140,15 +134,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == 'check_another':
         await query.message.reply_text("Send another BIN:")
 
-def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+async def main():
+    # Start Flask in a separate thread
+    Thread(target=run_flask).start()
+    
+    application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_bin))
     application.add_handler(CallbackQueryHandler(button_callback))
 
     print("Premium BIN Checker Bot is starting...")
-    application.run_polling(drop_pending_updates=True)
+    await application.initialize()
+    await application.start()
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
